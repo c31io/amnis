@@ -94,3 +94,8 @@ finish print(s)
 finish close()
 _ demux()
 ```
+
+
+## Debug
+
+Use `debug` to print state? TODO
