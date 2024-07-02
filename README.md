@@ -76,27 +76,21 @@ _ demux()           # Wait for all channels to close.
 anotherFn(y y1 y2)
 ```
 
-Use locks to sync. I am not sure about this right now, though.
+Use `close()` and `wait()` to sync.
 
 ```
 mux()
 _ channel() chan1
 _ channel() chan2
 _ channel() finish
-_ locked() lock1
-_ locked() lock2
 chan1 work1()
-chan1 unlock(lock1)
+chan1 close()
 chan2 work2()
-chan2 unlock(lock2)
-finish lock(lock1)
-finish lock(lock2)
-finish block(works) # Wait for chan{1,2} to join.
+chan2 close()
+finish wait(chan1)
+finish wait(chan2)
 finish str(done) s
 finish print(s)
-chan1 close()       # Still need to close them.
-chan2 close()
 finish close()
 _ demux()
 ```
-
