@@ -19,10 +19,15 @@ I just wrote this `README.md`.
 
 Escape them with `\*` (`\n` for the line feed).
 
+`bytes(n) b`, then in the next line, read `n` bytes to `b`, ignoring escapes.
+
 ### Output
 
 * Line feed for output partioning.
 * `#` for error messages.
+* `_<length>_` for bytes in the next line, ignoring escapes.
+
+Only the first byte needs escaping.
 
 ## Syntax
 
@@ -95,7 +100,50 @@ finish close()
 _ demux()
 ```
 
+## Iterator
+
+When a function detects an iterator version of input,
+it runs multiple times then collect the result to a list.
+In async context, use `iterPara()` to parallelize.
+
+```
+i32Array(1 2 3) a
+iter(a) i
+print(i)
+```
+
+The above is just a fancier below.
+
+```
+i32(1) i
+print(i)
+i32(2) i
+print(i)
+i32(3) i
+print(i)
+```
+
+Yes, there is a range that takes less space.
+
+```
+i32Range(1 3) r
+```
+
+All three iterate in the same way.
+
+```
+i32RangeSecond(1 3 9) r1
+i32RangeStep(1 2 9) r2
+i32Array(1 3 5 7 9) a
+```
 
 ## Debug
 
 Use `debug` to print state? TODO
+
+## Application Scenario
+
+1. Functions are expensive, mostly database queries.
+2. The memory of the interpreter is small and expensive.
+3. Interact with a query frontend at the edge.
+4. Parsing time is bounded, so no code generation syntax.
