@@ -66,37 +66,39 @@ print(s)                # Finally, hello world!
 You can't create functions on the client side.
 If you want more features, build a compiler.
 
-## Multiplexing and Syncing
+## TV-like concurrency
+
+Inspired by Zig async and TVs.
 
 ```
 fn(x) y
 mux()               # Multiplexing shares variables.
-_ channel() chan1   # Create channels.
-_ channel() chan2
+_ play() chan1      # Create channels.
+_ play() chan2
 chan1 fn(x1) y1
 chan2 fn(x2) y2
-chan1 close()
-chan2 close()
-_ demux()           # Wait for all channels to close.
+chan1 stop()        # Only possible to stop locally.
+chan2 stop()
+_ demux()           # Wait for all channels to stop.
 anotherFn(y y1 y2)
 ```
 
-Use `close()` and `wait()` to sync.
+Use `pause()` and `resume()` to sync.
 
 ```
 mux()
-_ channel() chan1
-_ channel() chan2
-_ channel() finish
+_ play() chan1
+_ play() chan2
+_ play() finish
+finish pause()
 chan1 work1()
-chan1 close()
+chan1 resume(finish)
+finish pause()
 chan2 work2()
-chan2 close()
-finish wait(chan1)
-finish wait(chan2)
+chan2 resume(finish)
 finish str(done) s
 finish print(s)
-finish close()
+finish stop()
 _ demux()
 ```
 
