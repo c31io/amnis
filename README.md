@@ -4,7 +4,7 @@ A minimal streaming RPC language, which is Some-Sort-of-Shell-Script (SSoSS).
 
 ## Progress
 
-I just wrote this `README.md`.
+I just wrote this `README.md`. I'll try to write a Rust trait.
 
 ## Escape Sequence
 
@@ -59,7 +59,7 @@ ifel(c laC laD)
 label(laC)          # If c is true, start here.
 unreachable()
 label(laD)          # If c is false, start here.
-str(Hello,\ World!) s   # Create a string.
+str(Hello,\ World!) s   # Create a string from a name.
 print(s)                # Finally, hello world!
 ```
 
@@ -108,6 +108,11 @@ When a function detects an iterator version of input,
 it runs multiple times then collect the result to a list.
 In async context, use `iterPara()` to parallelize.
 
+The use of iterator is strongly discouraged.
+If you need list operation, you may implement server side.
+
+Struct is not supported, use the SoA pattern.
+
 ```
 i32Array(1 2 3) a
 iter(a) i
@@ -141,7 +146,13 @@ i32Array(1 3 5 7 9) a
 
 ## Debug
 
-Use `debug` to print state? TODO
+Use `debug` to print state. To print gas metrics.
+
+```
+str(gas) g
+strArray(g) a
+debug(a)
+```
 
 ## Application Scenario
 
