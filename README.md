@@ -102,6 +102,8 @@ finish stop()
 _ demux()
 ```
 
+Naive bytes IO is banned in mux context, because it is synced for memory efficiency. I'll make some cache storage functions.
+
 ## Iterator
 
 When a function detects an iterator version of input,
