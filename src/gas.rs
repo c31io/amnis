@@ -1,6 +1,6 @@
 use crate::{Error, Result};
 
-pub struct GasPlan {
+pub struct Gas {
     /// Cap total usage
     all: Option<i64>,
 
@@ -26,7 +26,7 @@ pub struct GasPlan {
     down: Option<i64>,
 }
 
-impl GasPlan {
+impl Gas {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         all: Option<i64>,
@@ -38,7 +38,7 @@ impl GasPlan {
         up: Option<i64>,
         down: Option<i64>,
     ) -> Result<Self> {
-        let plan = GasPlan {
+        let plan = Gas {
             all,
             time,
             comp,

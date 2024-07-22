@@ -2,7 +2,7 @@ mod amnis;
 mod channel;
 mod error;
 mod function;
-mod gas_plan;
+mod gas;
 mod variable;
 
 pub use amnis::Amnis;
