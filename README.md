@@ -19,142 +19,106 @@ I just wrote this `README.md`. I'll try to write a Rust trait.
 
 Escape them with `\*` (`\n` for the line feed).
 
-`bytes(n) b`, then in the next line, read `n` bytes to `b`, ignoring escapes.
+`_ bytes(n) b`, then in the next line, read `n` bytes to `b`, ignoring escapes.
 
 ### Output
 
-* Line feed for output partioning.
-* `#` for error messages.
-* `_<length>_` for bytes in the next line, ignoring escapes.
-
-Only the first byte needs escaping.
+```
+message size, including everything below LF
+channel name LF
+line number LF
+message type (can be FIN) LF
+message content LF
+```
 
 ## Syntax
 
-`fn(in1 in2) out1 out2`
+`chan fn(in1 in2) out1 out2`
 
 ## In a Nutshell
 
 ```
 # Set the version
-version(1)          # The server function version.
-myFunction()        # Your function.
+_ version(1)            # The server function version.
+_ myFunction()          # Your function.
 
 # Variable
-i32(1) x            # Initialize x with i32 value 1.
-f64Array(1 2 3) fa  # Create fa, a f64 array [1,2,3].
-drop(a)             # Drop fa to free some space.
+_ i32(1) x              # Initialize x with i32 value 1.
+_ f64Array(1 2 3) fa    # Create fa, a f64 array [1,2,3].
+_ drop(a)               # Drop fa to free some space.
 
 # Control flow
-eq(x x) b           # b is true.
-goto(labelA)        # Go to line "label(labelA)".
-exit()              # An unreachable exit.
-label(labelA)       # Define a label.
-ifgo(b labelB)      # If b is true, then goto labelB.
-unreachable()       # An unreachable assertion.
-label(labelB)
-clear()             # You can't jump up anymore.
-not(b) c            # b is true, so c is false.
-ifel(c laC laD)
-label(laC)          # If c is true, start here.
-unreachable()
-label(laD)          # If c is false, start here.
-str(Hello,\ World!) s   # Create a string from a name.
-print(s)                # Finally, hello world!
+_ eq(x x) b             # b is true.
+_ goto(labelA)          # Go to line "label(labelA)".
+_ exit()                # An unreachable exit.
+_ label(labelA)         # Define a label.
+_ ifgo(b labelB)        # If b is true, then goto labelB.
+_ unreachable()         # An unreachable assertion.
+_ label(labelB)
+_ clear()               # You can't jump up anymore.
+_ not(b) c              # b is true, so c is false.
+_ ifel(c laC laD)
+_ label(laC)            # If c is true, start here.
+_ unreachable()
+_ label(laD)            # If c is false, start here.
+_ str(Hello,\ World!) s # Create a string from a name.
+_ print(s)              # Finally, hello world!
+_ stop()                # If not send, request will stay alive.
 ```
 
 You can't create functions on the client side.
 If you want more features, build a compiler.
 
-## TV-like concurrency
+## TV-like & Zig-like concurrency
 
-Inspired by Zig async and TVs.
+### TV-like handle-join parallelism.
 
 ```
-fn(x) y
-mux()               # Multiplexing shares variables.
 _ play() chan1      # Create channels.
 _ play() chan2
-chan1 fn(x1) y1
-chan2 fn(x2) y2
+chan1 fn1(x1) y1
+chan2 fn2(x2) y2
 chan1 stop()        # Only possible to stop locally.
-chan2 stop()
-_ demux()           # Wait for all channels to stop.
-anotherFn(y y1 y2)
+chan2 stop()        # Block until the channel finish.
+_ fn3(y1 y2) z
+_ stop()
 ```
+
+Intuitive but might cause heavy blockage.
+
+### Zig-like pause-resume concurrency.
 
 Use `pause()` and `resume()` to sync.
 
 ```
-mux()
 _ play() chan1
 _ play() chan2
-_ play() finish
-finish pause()
+_ pause()
 chan1 work1()
-chan1 resume(finish)
-finish pause()
+chan1 resume(_)
+_ pause()
 chan2 work2()
-chan2 resume(finish)
-finish str(done) s
-finish print(s)
-finish stop()
-_ demux()
+chan2 resume(_)
+_ str(done) s
+_ print(s)
+chan1 stop()
+chan2 stop()
+_ stop()
 ```
 
-Naive bytes IO is banned in mux context, because it is synced for memory efficiency. I'll make some cache storage functions.
+Channel suspends when pauses > resumes.
 
-## Iterator
+### Async Bytes I/O
 
-When a function detects an iterator version of input,
-it runs multiple times then collect the result to a list.
-In async context, use `iterPara()` to parallelize.
+Big payload should use http, not Amnis.
 
-The use of iterator is strongly discouraged.
-If you need list operation, you may implement server side.
+Async input is sent in chunk upload functions.
 
-Struct is not supported, use the SoA pattern.
+Async output arrives in chunks, with the same output format.
 
-```
-i32Array(1 2 3) a
-iter(a) i
-print(i)
-```
+### Why not async-await?
 
-The above is just a fancier below.
-
-```
-i32(1) i
-print(i)
-i32(2) i
-print(i)
-i32(3) i
-print(i)
-```
-
-Yes, there is a range that takes less space.
-
-```
-i32Range(1 3) r
-```
-
-All three iterate in the same way.
-
-```
-i32RangeSecond(1 3 9) r1
-i32RangeStep(1 2 9) r2
-i32Array(1 3 5 7 9) a
-```
-
-## Debug
-
-Use `debug` to print state. To print gas metrics.
-
-```
-str(gas) g
-strArray(g) a
-debug(a)
-```
+No color in Amnis, implement color client side.
 
 ## Application Scenario
 
