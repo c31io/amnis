@@ -38,10 +38,6 @@ message content LF
 ## In a Nutshell
 
 ```
-# Set the version
-_ version(1)            # The server function version.
-_ myFunction()          # Your function.
-
 # Variable
 _ i32(1) x              # Initialize x with i32 value 1.
 _ f64Array(1 2 3) fa    # Create fa, a f64 array [1,2,3].
@@ -116,7 +112,7 @@ Async input is sent in chunk upload functions.
 
 Async output arrives in chunks, with the same output format.
 
-### Why not async-await?
+### Why not Async-Await?
 
 No color in Amnis, implement color client side.
 
@@ -126,3 +122,19 @@ No color in Amnis, implement color client side.
 2. The memory of the interpreter is small and expensive.
 3. Interact with a query frontend at the edge.
 4. Parsing time is bounded, so no code generation syntax.
+
+## Wire Format
+
+Layered on top of TCP, HTTP, and QUIC.
+
+### Input
+
+u32 channel - i32 function - ( fixed-size input | ( u64 length - [u8; length] ) ) 
+
+channel: 0 is played on start.
+
+function: < 0 is buit-in. = 0 prints source code URL. > 0 is user-defined.
+
+### Output
+
+u32 line - u64 length - [u8; length]
