@@ -125,7 +125,7 @@ No color in Amnis, implement color client side.
 
 ## Wire Format
 
-Layered on top of TCP, HTTP, and QUIC.
+Layered on top of reliable duplex protocols, e.g. WS, TCP, and QUIC.
 
 ### Input
 
