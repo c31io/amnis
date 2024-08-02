@@ -1,9 +1,15 @@
+use std::ops::Try;
+
 use crate::{Error, Result};
 
-pub struct Gas {
+pub struct GasPlan {
     /// Cap total usage
     all: Option<i64>,
 
+    gas: Gas,
+}
+
+pub struct Gas {
     /// Timeout
     time: Option<i64>,
 
@@ -26,9 +32,9 @@ pub struct Gas {
     down: Option<i64>,
 }
 
-impl Gas {
+impl GasPlan {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub fn new_plan(
         all: Option<i64>,
         time: Option<i64>,
         comp: Option<i64>,
@@ -38,19 +44,53 @@ impl Gas {
         up: Option<i64>,
         down: Option<i64>,
     ) -> Result<Self> {
-        let plan = Gas {
+        let plan = GasPlan {
             all,
-            time,
-            comp,
-            memory,
-            index,
-            store,
-            up,
-            down,
+            gas: Gas {
+                time,
+                comp,
+                memory,
+                index,
+                store,
+                up,
+                down,
+            },
         };
-        match all.is_none() && !plan.is_rigourous() {
+        match all.is_none() && !plan.gas.is_rigourous() {
             true => Err(Error::InfGasPlan),
             false => Ok(plan),
+        }
+    }
+
+    pub fn get_cap(&self) -> Result<i64> {
+        match self.gas.is_rigourous() {
+            true => {
+                let Some(sum) = self.gas.sum() else {
+                    return Err(Error::GasPanOverflow);
+                };
+                Ok(match self.all {
+                    Some(all) => std::cmp::min(all, sum),
+                    None => sum,
+                })
+            }
+            false => match self.all {
+                Some(all) => Ok(all),
+                None => unreachable!(),
+            },
+        }
+    }
+}
+
+impl Gas {
+    pub fn zero() -> Self {
+        Gas {
+            time: Some(0),
+            comp: Some(0),
+            memory: Some(0),
+            index: Some(0),
+            store: Some(0),
+            up: Some(0),
+            down: Some(0),
         }
     }
 
@@ -64,25 +104,15 @@ impl Gas {
             && self.down.is_some()
     }
 
-    pub fn get_cap(&self) -> i64 {
-        match self.is_rigourous() {
-            true => {
-                let sum = self.time.unwrap()
-                    + self.comp.unwrap()
-                    + self.memory.unwrap()
-                    + self.index.unwrap()
-                    + self.store.unwrap()
-                    + self.up.unwrap()
-                    + self.down.unwrap();
-                match self.all {
-                    Some(all) => std::cmp::min(all, sum),
-                    None => sum,
-                }
-            }
-            false => match self.all {
-                Some(all) => all,
-                None => unreachable!(),
-            },
-        }
+    /// Panic if `Self.is_rigourous()` is `false`.
+    fn sum(&self) -> Option<i64> {
+        self.time
+            .unwrap()
+            .checked_add(self.comp.unwrap())?
+            .checked_add(self.memory.unwrap())?
+            .checked_add(self.index.unwrap())?
+            .checked_add(self.store.unwrap())?
+            .checked_add(self.up.unwrap())?
+            .checked_add(self.down.unwrap())
     }
 }
