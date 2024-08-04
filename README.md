@@ -137,4 +137,6 @@ function: < 0 is buit-in. = 0 prints source code URL. > 0 is user-defined.
 
 ### Output
 
-u32 line - u64 length - [u8; length]
+i32 channel - i32 line - u64 length - [u8; length]
+
+line < 0 means the last chunk of |line|.
