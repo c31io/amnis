@@ -3,7 +3,9 @@ mod channel;
 mod error;
 mod function;
 mod gas;
+mod io;
 mod variable;
+mod core;
 
 pub use amnis::Amnis;
 pub use error::Error;

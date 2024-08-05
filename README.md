@@ -129,14 +129,16 @@ Layered on top of reliable duplex protocols, e.g. WS, TCP, and QUIC.
 
 ### Input
 
-i32 channel - i32 function - ( fixed-size input | ( u64 length - [u8; length] ) ) 
+i32 channel - i32 function - ( fixed-size input | ( u64 size - [u8; size] ) ) 
 
-channel: 0 is played on start. +n is output, and -n is error message.
+channel: 0 is played on start.
 
 function: < 0 is buit-in. = 0 prints source code URL. > 0 is user-defined.
 
 ### Output
 
-i32 channel - i32 line - u64 length - [u8; length]
+i32 channel - i32 line - u64 size - [u8; size]
+
+channel: +n is output, and -n is error message, as a result, channel 0 has output and error in the same channel.
 
 line < 0 means the last chunk of |line|.
