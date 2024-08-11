@@ -1,5 +1,3 @@
-use std::ops::Try;
-
 use crate::{Error, Result};
 
 pub struct GasPlan {
