@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use futures::stream::BoxStream;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::{Arc, Mutex}};
 use tokio::sync::mpsc::{self, Sender};
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
     Amnis, Variable,
 };
 
-pub struct AmnisCore<'a> {
+pub struct AmnisState<'a> {
     gas_plan: GasPlan,
     gas_used: Gas,
     variables: HashMap<String, Variable>,
@@ -18,15 +18,21 @@ pub struct AmnisCore<'a> {
     input: BoxStream<'a, Bytes>,
 }
 
+pub struct AmnisCore<'a> {
+    state: Arc<Mutex<AmnisState<'a>>>,
+}
+
 #[async_trait::async_trait]
 impl<'a> Amnis<'a> for AmnisCore<'a> {
     fn new(gas_plan: GasPlan, input: BoxStream<'a, Bytes>) -> Self {
         AmnisCore {
-            gas_plan,
-            gas_used: Gas::zero(),
-            variables: HashMap::new(),
-            channels: HashMap::from([(0, Channel::new())]),
-            input,
+            state: Arc::new(Mutex::new(AmnisState {
+                gas_plan,
+                gas_used: Gas::zero(),
+                variables: HashMap::new(),
+                channels: HashMap::from([(0, Channel::new())]),
+                input,
+            })),
         }
     }
 
