@@ -25,6 +25,7 @@ dependencies = [
  "async-trait",
  "bytes",
  "futures",
+ "pin-project-lite",
  "tokio",
  "tokio-stream",
 ]

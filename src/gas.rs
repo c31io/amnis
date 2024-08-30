@@ -32,7 +32,7 @@ pub struct Gas {
 
 impl GasPlan {
     #[allow(clippy::too_many_arguments)]
-    pub fn new_plan(
+    pub fn new(
         all: Option<i64>,
         time: Option<i64>,
         comp: Option<i64>,
@@ -60,6 +60,13 @@ impl GasPlan {
         }
     }
 
+    pub fn max() -> Self {
+        GasPlan {
+            all: Some(std::i64::MAX),
+            gas: Gas::none(),
+        }
+    }
+
     pub fn get_cap(&self) -> Result<i64> {
         match self.gas.is_rigourous() {
             true => {
@@ -80,6 +87,18 @@ impl GasPlan {
 }
 
 impl Gas {
+    pub fn none() -> Self {
+        Gas {
+            time: None,
+            comp: None,
+            memory: None,
+            index: None,
+            store: None,
+            up: None,
+            down: None,
+        }
+    }
+
     pub fn zero() -> Self {
         Gas {
             time: Some(0),
