@@ -1,7 +1,9 @@
-use bytes::Bytes;
+use std::{pin::Pin, task::Poll};
+
+use bytes::{Bytes, BytesMut};
 use futures::stream::BoxStream;
 use pin_project_lite::pin_project;
-use tokio::io::{AsyncRead, Stdin};
+use tokio::io::{AsyncRead, ReadBuf, Stdin};
 
 pin_project! {
     /// Debug only, this is not a wire format.
@@ -31,14 +33,22 @@ impl<T> Utf8Input<T> {
 
 impl AsyncRead for Utf8Input<Stdin> {
     fn poll_read(
-        self: std::pin::Pin<&mut Self>,
+        mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> std::task::Poll<std::io::Result<()>> {
-        // read line
-        // get channel and function
-        // call the function parser
-        todo!()
+        // move `line` to the struct
+        // copy uninit buffer code from hyper
+        let mut line = ReadBuf::uninit(&mut []);
+        match Pin::new(&mut self.inner).poll_read(cx, &mut line) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
+            Poll::Ready(Ok(())) => {
+                // get channel and function
+                // call the function parser
+                todo!()
+            }
+        }
     }
 }
 
