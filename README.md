@@ -33,7 +33,7 @@ message content LF
 
 ## Syntax
 
-`chan fn(in1 in2) out1 out2`
+`chan fn(in1 in2) out1 out2<LF>` or `chan fn(in1 in2) out1 out2<LF>bytes-in-base64<LF>`
 
 ## In a Nutshell
 

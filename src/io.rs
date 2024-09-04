@@ -1,6 +1,6 @@
 use std::{pin::Pin, task::Poll};
 
-use bytes::{Bytes, BytesMut};
+use bytes::{Buf, Bytes};
 use futures::stream::BoxStream;
 use pin_project_lite::pin_project;
 use tokio::io::{AsyncRead, ReadBuf, Stdin};
@@ -35,21 +35,29 @@ impl AsyncRead for Utf8Input<Stdin> {
     fn poll_read(
         mut self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
-        buf: &mut tokio::io::ReadBuf<'_>,
-    ) -> std::task::Poll<std::io::Result<()>> {
-        // move `line` to the struct
-        // copy uninit buffer code from hyper
-        let mut line = ReadBuf::uninit(&mut []);
-        match Pin::new(&mut self.inner).poll_read(cx, &mut line) {
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        let mut slice = [0_u8; 1024];
+        let mut read_buf = ReadBuf::new(&mut slice);
+        match Pin::new(&mut self.inner).poll_read(cx, &mut read_buf) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
             Poll::Ready(Ok(())) => {
-                // get channel and function
-                // call the function parser
-                todo!()
+                if let Some(n) = statement_size(buf.filled()) {
+                    // get channel and function in i32
+                    // call the function parser
+                    // put the crap in buf
+                    todo!()
+                } else {
+                    return Poll::Pending;
+                }
             }
         }
     }
+}
+
+fn statement_size(slice: &[u8]) -> Option<usize> {
+    todo!()
 }
 
 pub struct OutputFrame {
