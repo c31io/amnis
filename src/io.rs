@@ -11,6 +11,8 @@ use futures::stream::BoxStream;
 use pin_project_lite::pin_project;
 use tokio::io::{AsyncRead, ReadBuf, Stdin};
 
+use crate::Result;
+
 struct Namespace {
     name_from_id: HashMap<i32, String>,
     name_to_id: HashMap<String, i32>,
@@ -53,7 +55,7 @@ impl Namespace {
     }
 
     fn remove_id(&mut self, id: &i32) -> Option<String> {
-        let name= self.name_from_id.get(id)?;
+        let name = self.name_from_id.get(id)?;
         self.name_to_id.remove(name);
         self.name_from_id.remove(id)
     }
@@ -64,35 +66,67 @@ struct Statement {
     function: i32,
     input: Box<[i32]>,
     output: Box<[i32]>,
-    binary: Box<[u8]>,
+    binary: Option<Box<[u8]>>,
 }
 
 enum Token {
     Channel(i32),
     Function(i32),
+    InputStart,
     Input(i32),
+    InputEnd,
     Output(i32),
-    Binary(Box<[u8]>),
+    LineFeed,
+    Base64(Box<[u8]>),
+    EndOfStatement,
 }
 
 impl Token {
-    fn take(text: &mut String, tokens: &mut Vec<Token>) {
+    fn take(text: &mut String, tokens: &mut Vec<Token>) -> Result<()> {
         let mut slice = text.as_str();
-        while let Some((token, end)) = Token::take_one(slice, tokens) {
+        let mut consumption = 0;
+        while let Some((token, end)) = Token::take_one(slice, tokens)? {
             tokens.push(token);
             slice = &slice[end..];
+            consumption += end;
         }
+        *text = text[consumption..].to_owned();
+        Ok(())
     }
 
-    fn take_one(text: &str, tokens: &mut Vec<Token>) -> Option<(Self, usize)> {
+    fn take_one(text: &str, tokens: &mut Vec<Token>) -> Result<Option<(Self, usize)>> {
         match tokens.last() {
-            Some(Token::Binary(_)) | None => todo!(),
-            Some(Token::Channel(_)) => todo!(),
-            Some(Token::Function(_)) => todo!(),
-            Some(Token::Input(_)) => todo!(),
-            Some(Token::Output(_)) => todo!(),
+            Some(Token::EndOfStatement) | None => {
+                // get channel
+                todo!()
+            }
+            Some(Token::Channel(_)) => {
+                // get function
+                todo!()
+            }
+            Some(Token::Function(_)) => {
+                // get input start
+                todo!()
+            }
+            Some(Token::InputStart | Token::Input(_)) => {
+                // get input or input end
+                todo!()
+            }
+            Some(Token::InputEnd | Token::Output(_)) => {
+                // get output or lfao
+                todo!()
+            }
+            Some(Token::LineFeed) => {
+                // look back to function
+                // if no bin, return eos
+                // else get base64
+                todo!()
+            }
+            Some(Token::Base64(..)) => {
+                // get eos
+                todo!()
+            },
         }
-        todo!()
     }
 }
 
