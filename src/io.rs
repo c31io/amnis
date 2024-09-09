@@ -43,11 +43,14 @@ impl AsyncRead for Utf8Input<Stdin> {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
             Poll::Ready(Ok(())) => {
-                if let Some(n) = statement_size(buf.filled()) {
-                    // get channel and function in i32
-                    // call the function parser
-                    // put the crap in buf
-                    todo!()
+                let s = match String::from_utf8(buf.filled().to_vec()) {
+                    Ok(s) => s,
+                    Err(_) => return Poll::Ready(Err(std::io::ErrorKind::InvalidInput.into())),
+                };
+                if let Some(n) = statement_size(&s) {
+                    let statement = Statement::new(&s[n..]);
+                    statement.to_bytes();
+                    Poll::Ready(Ok(()))
                 } else {
                     return Poll::Pending;
                 }
@@ -56,8 +59,55 @@ impl AsyncRead for Utf8Input<Stdin> {
     }
 }
 
-fn statement_size(slice: &[u8]) -> Option<usize> {
-    todo!()
+/// Non-ascii might fuck up. No one uses unicode for names anyway.
+fn statement_size(s: &str) -> Option<usize> {
+    let full = s.len();
+    let mut string = s.trim_start();
+    let mut trimmed = string.len();
+    let mut first_space = loop {
+        match string.find(' ') {
+            Some(n) => {
+                // Indexing will not panic, because string is trimmed from the start.
+                if string.as_bytes()[n - 1] != b'\\' {
+                    break n;
+                } else {
+                    string = &string[n + 1..];
+                    trimmed += n + 1;
+                }
+            }
+            None => return None,
+        }
+    };
+    first_space += full - trimmed;
+    let mut first_parenthesis = loop {
+        match string.find('(') {
+            Some(n) => {
+                // Indexing will not panic, because string is trimmed from the start.
+                if string.as_bytes()[n - 1] != b'\\' {
+                    break n;
+                } else {
+                    string = &string[n + 1..];
+                    trimmed += n + 1;
+                }
+            }
+            None => return None,
+        }
+    };
+    first_parenthesis += full - trimmed;
+    let function_name = &s[first_space + 1..first_parenthesis].trim();
+    let first_lf = s.find('\n');
+    let second_lf =
+        first_lf.and_then(|fst| s[fst + 1..].find('\n').and_then(|snd| Some(snd + fst + 1)));
+    let bytes_attached = is_attached_fn(function_name);
+    if bytes_attached {
+        return second_lf;
+    } else {
+        return first_lf;
+    };
+}
+
+fn is_attached_fn(_s: &str) -> bool {
+    return false;
 }
 
 pub struct OutputFrame {
