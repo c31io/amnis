@@ -2,11 +2,10 @@ use std::{
     collections::HashMap,
     mem::MaybeUninit,
     pin::Pin,
-    sync::{Arc, Mutex},
     task::Poll,
 };
 
-use bytes::{Buf, Bytes};
+use bytes::Bytes;
 use futures::stream::BoxStream;
 use pin_project_lite::pin_project;
 use tokio::io::{AsyncRead, ReadBuf, Stdin};
@@ -66,10 +65,21 @@ struct Statement {
     function: i32,
     input: Box<[i32]>,
     output: Box<[i32]>,
-    binary: Option<Box<[u8]>>,
+    body: Option<Box<[u8]>>,
 }
 
-enum Token {
+impl Statement {
+    fn new(tokens: &mut Vec<Token>) -> Vec<Self> {
+        todo!()
+    }
+
+    fn write(&self, dest: &mut ReadBuf) {
+        // write self to buffer
+        todo!()
+    }
+}
+
+pub enum Token {
     Channel(i32),
     Function(i32),
     InputStart,
@@ -77,7 +87,7 @@ enum Token {
     InputEnd,
     Output(i32),
     LineFeed,
-    Base64(Box<[u8]>),
+    Body(Box<[u8]>),
     EndOfStatement,
 }
 
@@ -122,7 +132,7 @@ impl Token {
                 // else get base64
                 todo!()
             }
-            Some(Token::Base64(..)) => {
+            Some(Token::Body(..)) => {
                 // get eos
                 todo!()
             },
@@ -135,7 +145,6 @@ pin_project! {
     pub struct Utf8Input<T> {
         #[pin]
         inner: T,
-        buf: [MaybeUninit<u8>; 1024],
         text: String,
         tokens: Vec<Token>,
     }
@@ -145,7 +154,6 @@ impl<T> Utf8Input<T> {
     pub fn new(inner: T) -> Self {
         Utf8Input {
             inner,
-            buf: MaybeUninit::uninit_array(),
             text: String::new(),
             tokens: Vec::new(),
         }
@@ -162,6 +170,10 @@ impl<T> Utf8Input<T> {
     pub fn into_inner(self) -> T {
         self.inner
     }
+
+    pub fn borrow_two(&mut self) -> (&mut String, &mut Vec<Token>) {
+        (&mut self.text, &mut self.tokens)
+    }
 }
 
 impl AsyncRead for Utf8Input<Stdin> {
@@ -170,77 +182,33 @@ impl AsyncRead for Utf8Input<Stdin> {
         cx: &mut std::task::Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
-        let mut read_buf = ReadBuf::uninit(&mut self.buf);
+        let mut inner_buf: [MaybeUninit<u8>; 1024] = MaybeUninit::uninit_array();
+        let mut read_buf = ReadBuf::uninit(&mut inner_buf);
         match Pin::new(&mut self.inner).poll_read(cx, &mut read_buf) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
             Poll::Ready(Ok(())) => {
-                let s = match String::from_utf8(buf.filled().to_vec()) {
+                let s = match String::from_utf8(read_buf.filled().to_vec()) {
                     Ok(s) => s,
                     Err(_) => return Poll::Ready(Err(std::io::ErrorKind::InvalidInput.into())),
                 };
                 self.text.push_str(&s);
-                if let Some(n) = statement_size(&s) {
-                    let statement = Statement::new(&s[n..]);
-                    statement.to_bytes();
-                    Poll::Ready(Ok(()))
-                } else {
+                // get tokens
+                let (text, tokens) = self.borrow_two();
+                if Token::take(text, tokens).is_err() {
+                    return Poll::Ready(Err(std::io::ErrorKind::InvalidInput.into()));
+                }
+                // write statements
+                let statements = Statement::new(tokens);
+                if statements.is_empty() {
                     return Poll::Pending;
+                } else {
+                    statements.iter().for_each(|s| s.write(buf));
+                    return Poll::Ready(Ok(()))
                 }
             }
         }
     }
-}
-
-/// Non-ascii might fuck up. No one uses unicode for names anyway.
-fn statement_size(s: &str) -> Option<usize> {
-    let full = s.len();
-    let mut string = s.trim_start();
-    let mut trimmed = string.len();
-    let mut first_space = loop {
-        match string.find(' ') {
-            Some(n) => {
-                // Indexing will not panic, because string is trimmed from the start.
-                if string.as_bytes()[n - 1] != b'\\' {
-                    break n;
-                } else {
-                    string = &string[n + 1..];
-                    trimmed += n + 1;
-                }
-            }
-            None => return None,
-        }
-    };
-    first_space += full - trimmed;
-    let mut first_parenthesis = loop {
-        match string.find('(') {
-            Some(n) => {
-                // Indexing will not panic, because string is trimmed from the start.
-                if string.as_bytes()[n - 1] != b'\\' {
-                    break n;
-                } else {
-                    string = &string[n + 1..];
-                    trimmed += n + 1;
-                }
-            }
-            None => return None,
-        }
-    };
-    first_parenthesis += full - trimmed;
-    let function_name = &s[first_space + 1..first_parenthesis].trim();
-    let first_lf = s.find('\n');
-    let second_lf =
-        first_lf.and_then(|fst| s[fst + 1..].find('\n').and_then(|snd| Some(snd + fst + 1)));
-    let bytes_attached = is_attached_fn(function_name);
-    if bytes_attached {
-        return second_lf;
-    } else {
-        return first_lf;
-    };
-}
-
-fn is_attached_fn(_s: &str) -> bool {
-    return false;
 }
 
 pub struct OutputFrame {
