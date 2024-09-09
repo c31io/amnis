@@ -1,3 +1,5 @@
+#![feature(maybe_uninit_uninit_array)]
+
 mod amnis;
 mod channel;
 mod core;

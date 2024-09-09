@@ -1,21 +1,120 @@
-use std::{pin::Pin, task::Poll};
+use std::{
+    collections::HashMap,
+    mem::MaybeUninit,
+    pin::Pin,
+    sync::{Arc, Mutex},
+    task::Poll,
+};
 
 use bytes::{Buf, Bytes};
 use futures::stream::BoxStream;
 use pin_project_lite::pin_project;
 use tokio::io::{AsyncRead, ReadBuf, Stdin};
 
+struct Namespace {
+    name_from_id: HashMap<i32, String>,
+    name_to_id: HashMap<String, i32>,
+    last_id: i32,
+}
+
+impl Namespace {
+    fn new() -> Self {
+        Namespace {
+            name_from_id: HashMap::new(),
+            name_to_id: HashMap::new(),
+            last_id: 0,
+        }
+    }
+
+    fn add_name(&mut self, name: &str) -> Option<i32> {
+        match self.name_to_id.get(name) {
+            Some(_) => None,
+            None => {
+                self.last_id += 1;
+                self.name_from_id.insert(self.last_id, name.to_owned());
+                self.name_to_id.insert(name.to_owned(), self.last_id);
+                Some(self.last_id)
+            }
+        }
+    }
+
+    fn get_name(&self, id: &i32) -> Option<String> {
+        Some(self.name_from_id.get(id)?.clone())
+    }
+
+    fn get_id(&self, name: &str) -> Option<i32> {
+        Some(self.name_to_id.get(name)?.clone())
+    }
+
+    fn remove_name(&mut self, name: &str) -> Option<i32> {
+        let id = self.name_to_id.get(name)?;
+        self.name_from_id.remove(id);
+        self.name_to_id.remove(name)
+    }
+
+    fn remove_id(&mut self, id: &i32) -> Option<String> {
+        let name= self.name_from_id.get(id)?;
+        self.name_to_id.remove(name);
+        self.name_from_id.remove(id)
+    }
+}
+
+struct Statement {
+    channel: i32,
+    function: i32,
+    input: Box<[i32]>,
+    output: Box<[i32]>,
+    binary: Box<[u8]>,
+}
+
+enum Token {
+    Channel(i32),
+    Function(i32),
+    Input(i32),
+    Output(i32),
+    Binary(Box<[u8]>),
+}
+
+impl Token {
+    fn take(text: &mut String, tokens: &mut Vec<Token>) {
+        let mut slice = text.as_str();
+        while let Some((token, end)) = Token::take_one(slice, tokens) {
+            tokens.push(token);
+            slice = &slice[end..];
+        }
+    }
+
+    fn take_one(text: &str, tokens: &mut Vec<Token>) -> Option<(Self, usize)> {
+        match tokens.last() {
+            Some(Token::Binary(_)) | None => todo!(),
+            Some(Token::Channel(_)) => todo!(),
+            Some(Token::Function(_)) => todo!(),
+            Some(Token::Input(_)) => todo!(),
+            Some(Token::Output(_)) => todo!(),
+        }
+        todo!()
+    }
+}
+
 pin_project! {
     /// Debug only, this is not a wire format.
     pub struct Utf8Input<T> {
         #[pin]
         inner: T,
+        buf: [MaybeUninit<u8>; 1024],
+        text: String,
+        tokens: Vec<Token>,
     }
 }
 
 impl<T> Utf8Input<T> {
     pub fn new(inner: T) -> Self {
-        Utf8Input { inner }
+        Utf8Input {
+            inner,
+            buf: MaybeUninit::uninit_array(),
+            text: String::new(),
+            tokens: Vec::new(),
+        }
     }
 
     pub fn inner(&self) -> &T {
@@ -37,8 +136,7 @@ impl AsyncRead for Utf8Input<Stdin> {
         cx: &mut std::task::Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
-        let mut slice = [0_u8; 1024];
-        let mut read_buf = ReadBuf::new(&mut slice);
+        let mut read_buf = ReadBuf::uninit(&mut self.buf);
         match Pin::new(&mut self.inner).poll_read(cx, &mut read_buf) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Err(error)) => Poll::Ready(Err(error)),
@@ -47,6 +145,7 @@ impl AsyncRead for Utf8Input<Stdin> {
                     Ok(s) => s,
                     Err(_) => return Poll::Ready(Err(std::io::ErrorKind::InvalidInput.into())),
                 };
+                self.text.push_str(&s);
                 if let Some(n) = statement_size(&s) {
                     let statement = Statement::new(&s[n..]);
                     statement.to_bytes();
