@@ -1,16 +1,11 @@
-use std::{
-    collections::HashMap,
-    mem::MaybeUninit,
-    pin::Pin,
-    task::Poll,
-};
+use std::{any::Any, collections::HashMap, mem::MaybeUninit, pin::Pin, task::Poll};
 
 use bytes::Bytes;
 use futures::stream::BoxStream;
 use pin_project_lite::pin_project;
 use tokio::io::{AsyncRead, ReadBuf, Stdin};
 
-use crate::Result;
+use crate::{Error, Result};
 
 struct Namespace {
     name_from_id: HashMap<i32, String>,
@@ -63,14 +58,52 @@ impl Namespace {
 struct Statement {
     channel: i32,
     function: i32,
-    input: Box<[i32]>,
-    output: Box<[i32]>,
+    inputs: Vec<i32>,
+    outputs: Vec<i32>,
     body: Option<Box<[u8]>>,
 }
 
 impl Statement {
-    fn new(tokens: &mut Vec<Token>) -> Vec<Self> {
-        todo!()
+    fn take_tokens(tokens: &mut Vec<Token>) -> Result<Vec<Self>> {
+        let mut statements = Vec::new();
+        while let Some(end) = tokens.iter().position(|t| *t == Token::EndOfStatement) {
+            let mut inputs = Vec::new();
+            let mut input_index = 3;
+            while let Token::Input(input) = tokens[input_index] {
+                inputs.push(input);
+                input_index += 1;
+            }
+
+            let mut outputs = Vec::new();
+            let mut output_index = 1 + match tokens.iter().position(|t| *t == Token::InputEnd) {
+                Some(i) => i,
+                None => return Err(Error::InvalidInput),
+            };
+            while let Token::Output(output) = tokens[output_index] {
+                outputs.push(output);
+                output_index += 1;
+            }
+
+            statements.push(Statement {
+                channel: match tokens[0] {
+                    Token::Channel(c) => c,
+                    _ => return Err(Error::InvalidInput),
+                },
+                function: match tokens[1] {
+                    Token::Function(f) => f,
+                    _ => return Err(Error::InvalidInput),
+                },
+                inputs,
+                outputs,
+                body: match &tokens[end - 1] {
+                    Token::Body(b) => Some(b.clone()),
+                    Token::LineFeed => None,
+                    _ => return Err(Error::InvalidInput),
+                },
+            });
+            *tokens = tokens[end + 1..].to_vec();
+        }
+        Ok(statements)
     }
 
     fn write(&self, dest: &mut ReadBuf) {
@@ -79,6 +112,7 @@ impl Statement {
     }
 }
 
+#[derive(Clone, PartialEq)]
 pub enum Token {
     Channel(i32),
     Function(i32),
@@ -135,7 +169,7 @@ impl Token {
             Some(Token::Body(..)) => {
                 // get eos
                 todo!()
-            },
+            }
         }
     }
 }
@@ -199,12 +233,15 @@ impl AsyncRead for Utf8Input<Stdin> {
                     return Poll::Ready(Err(std::io::ErrorKind::InvalidInput.into()));
                 }
                 // write statements
-                let statements = Statement::new(tokens);
+                let statements = match Statement::take_tokens(tokens) {
+                    Ok(s) => s,
+                    Err(_) => return Poll::Ready(Err(std::io::ErrorKind::InvalidInput.into())),
+                };
                 if statements.is_empty() {
                     return Poll::Pending;
                 } else {
                     statements.iter().for_each(|s| s.write(buf));
-                    return Poll::Ready(Ok(()))
+                    return Poll::Ready(Ok(()));
                 }
             }
         }
