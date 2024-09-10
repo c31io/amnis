@@ -1,6 +1,6 @@
-use std::{any::Any, collections::HashMap, mem::MaybeUninit, pin::Pin, task::Poll};
+use std::{collections::HashMap, mem::MaybeUninit, pin::Pin, task::Poll};
 
-use bytes::Bytes;
+use bytes::{BufMut, Bytes};
 use futures::stream::BoxStream;
 use pin_project_lite::pin_project;
 use tokio::io::{AsyncRead, ReadBuf, Stdin};
@@ -106,9 +106,14 @@ impl Statement {
         Ok(statements)
     }
 
-    fn write(&self, dest: &mut ReadBuf) {
-        // write self to buffer
-        todo!()
+    fn write(&self, buf: &mut ReadBuf) {
+        buf.put_i32(self.channel);
+        buf.put_i32(self.function);
+        self.inputs.iter().for_each(|&i| buf.put_i32(i));
+        self.outputs.iter().for_each(|&i| buf.put_i32(i));
+        if let Some(b) = &self.body {
+            buf.put_slice(&b);
+        }
     }
 }
 
