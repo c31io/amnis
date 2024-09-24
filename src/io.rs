@@ -5,6 +5,7 @@ use futures::stream::BoxStream;
 use pin_project_lite::pin_project;
 use tokio::io::{AsyncRead, ReadBuf, Stdin};
 
+use crate::function::Function;
 use crate::{Error, Result};
 
 struct Namespace {
@@ -130,6 +131,22 @@ pub enum Token {
     EndOfStatement,
 }
 
+fn first_non_whitespace_position(s: &str) -> Option<usize> {
+    let mut i = 0;
+    while i < s.len() {
+        // safe since
+        if !s.as_bytes()[i].is_ascii_whitespace() {
+            break;
+        }
+        i += 1;
+    }
+    if i == s.len() {
+        return None;
+    } else {
+        return Some(i);
+    }
+}
+
 impl Token {
     fn take(text: &mut String, tokens: &mut Vec<Token>) -> Result<()> {
         let mut slice = text.as_str();
@@ -144,32 +161,73 @@ impl Token {
     }
 
     fn take_one(text: &str, tokens: &mut Vec<Token>) -> Result<Option<(Self, usize)>> {
+        // The last token as the parsing context.
         match tokens.last() {
+            // Get Token::Channel
             Some(Token::EndOfStatement) | None => {
-                // get channel
-                todo!()
+                let i = match first_non_whitespace_position(text) {
+                    Some(i) => i,
+                    None => return Ok(None),
+                };
+                match text[i..].find(char::is_whitespace) {
+                    Some(j) => Ok(Some((
+                        Token::Channel(text[i..j].parse().map_err(|_| Error::InvalidInput)?),
+                        j,
+                    ))),
+                    None => Ok(None),
+                }
             }
+            // Get Token::Function
             Some(Token::Channel(_)) => {
-                // get function
-                todo!()
+                let i = match first_non_whitespace_position(text) {
+                    Some(i) => i,
+                    None => return Ok(None),
+                };
+                match text[i..].find(char::is_whitespace) {
+                    Some(j) => Ok(Some((
+                        Token::Function(Function::name_to_i32(&text[i..j])?),
+                        j,
+                    ))),
+                    None => Ok(None),
+                }
             }
+            // Get Token::InputStart
             Some(Token::Function(_)) => {
-                // get input start
-                todo!()
+                let i = match first_non_whitespace_position(text) {
+                    Some(i) => i,
+                    None => return Ok(None),
+                };
+                match text.as_bytes()[i] {
+                    b'(' => Ok(Some((Token::InputStart, i + 1))),
+                    _ => Err(Error::InvalidInput),
+                }
             }
+            // Fet Input or InputEnd
             Some(Token::InputStart | Token::Input(_)) => {
-                // get input or input end
                 todo!()
             }
             Some(Token::InputEnd | Token::Output(_)) => {
-                // get output or lfao
+                // get output or lf
                 todo!()
             }
             Some(Token::LineFeed) => {
                 // look back to function
+                let mut i = tokens.len();
+                let has_bin = loop {
+                    // SAFE, Function must exist in tokens.
+                    i -= 1;
+                    if let Token::Function(f) = tokens[i] {
+                        break true; //TODO function.has_bin()
+                    }
+                };
+                match has_bin {
+                    false => Ok(Token::EndOfStatement),
+                    true => {
+                        todo!()
+                    }
+                }
                 // if no bin, return eos
                 // else get base64
-                todo!()
             }
             Some(Token::Body(..)) => {
                 // get eos
