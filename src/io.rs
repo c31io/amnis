@@ -5,8 +5,7 @@ use futures::stream::BoxStream;
 use pin_project_lite::pin_project;
 use tokio::io::{AsyncRead, ReadBuf, Stdin};
 
-use crate::function::Function;
-use crate::{Error, Result};
+use crate::{Error, Function, Result};
 
 struct Namespace {
     name_from_id: HashMap<i32, String>,
@@ -221,7 +220,7 @@ impl Token {
                     }
                 };
                 match has_bin {
-                    false => Ok(Token::EndOfStatement),
+                    false => Ok(Some((Token::EndOfStatement, 0))), //TODO length
                     true => {
                         todo!()
                     }
@@ -316,6 +315,17 @@ pub struct OutputFrame {
     line: i32,
     size: u64,
     payload: Bytes,
+}
+
+impl OutputFrame {
+    pub fn new(channel: i32, line: i32, size: u64, payload: Bytes) -> Self {
+        OutputFrame {
+            channel,
+            line,
+            size,
+            payload,
+        }
+    }
 }
 
 pub struct Output {

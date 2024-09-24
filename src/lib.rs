@@ -19,5 +19,6 @@ pub use io::{Utf8Input, Output};
 
 pub use error::Error;
 pub use variable::Variable;
+pub use function::Function;
 
 pub type Result<T> = std::result::Result<T, Error>;
