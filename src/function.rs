@@ -1,10 +1,70 @@
+extern crate proc_macro;
+use proc_macro::TokenStream;
+
 use bytes::Bytes;
+use syn::{parse_macro_input, Data, DeriveInput, Fields};
+use quote::quote;
 
 use crate::io::OutputFrame;
 use crate::variable::Variable;
 use crate::{Error, Result};
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[proc_macro_derive(HasBin, attributes(bin))]
+fn has_bin_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+
+    let data_enum = match &input.data {
+        Data::Enum(data_enum) => data_enum,
+        _ => {
+            return syn::Error::new_spanned(input.ident, "HasBin can only be derived for enums")
+                .to_compile_error()
+                .into();
+        }
+    };
+
+    let match_arms = data_enum.variants.iter().map(|variant| {
+        let variant_ident = &variant.ident;
+        let has_bin_attribute = variant.attrs.iter().any(|attr| attr.path().is_ident("bin"));
+        let value = if has_bin_attribute {
+            quote! { true }
+        } else {
+            quote! { false }
+        };
+
+        match &variant.fields {
+            Fields::Unit => {
+                quote! {
+                    #name::#variant_ident => #value,
+                }
+            }
+            Fields::Unnamed(_) => {
+                quote! {
+                    #name::#variant_ident(..) => #value,
+                }
+            }
+            Fields::Named(_) => {
+                quote! {
+                    #name::#variant_ident { .. } => #value,
+                }
+            }
+        }
+    });
+
+    let expanded = quote! {
+        impl #name {
+            pub fn has_bin_attribute(&self) -> bool {
+                match self {
+                    #(#match_arms)*
+                }
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, HasBin)]
 pub enum Function {
     Null = 0,
     Echo = 1,

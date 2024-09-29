@@ -11,3 +11,8 @@ futures = "0.3"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 pin-project-lite = "0.2"
+quote = "1"
+syn = "2"
+
+[lib]
+proc-macro = true

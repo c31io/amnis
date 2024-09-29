@@ -1,3 +1,4 @@
+#![feature(proc_macro_quote)]
 #![feature(maybe_uninit_uninit_array)]
 
 mod amnis;
