@@ -13,7 +13,7 @@ pub enum Function {
 impl Function {
     pub fn new(id: i32) -> Result<Self> {
         let id: u8 = id.try_into().map_err(|_| Error::FnIdInvalid)?;
-        unsafe { Ok(std::mem::transmute::<_, Function>(id)) }
+        unsafe { Ok(std::mem::transmute::<u8, Function>(id)) }
     }
 
     pub fn get_id(&self) -> i32 {
@@ -29,7 +29,7 @@ impl Function {
         Ok(0) //TODO impl
     }
 
-    pub fn call(&self, args: Box<[Variable]>, channel: i32, line: i32, size: u64) -> OutputFrame
+    pub fn call(&self, args: &[Variable], channel: i32, line: i32, size: u64) -> OutputFrame
     where
         Self: Sized,
     {

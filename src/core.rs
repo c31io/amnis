@@ -40,11 +40,11 @@ impl Amnis for AmnisCore {
         let (tx, mut rx) = mpsc::channel::<OutputFrame>(32);
         // Feed inputs to channels
         let state = self.state.clone();
-        tokio::spawn((|| async move {
+        tokio::spawn(async move {
             drop(tx);
             drop(state);
             drop(input);
-        })());
+        });
         // Early return the output stream
         Output::new(Box::pin(async_stream::stream! {
             while let Some(item) = rx.recv().await {

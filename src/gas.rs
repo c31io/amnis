@@ -62,7 +62,7 @@ impl GasPlan {
 
     pub fn max() -> Self {
         GasPlan {
-            all: Some(std::i64::MAX),
+            all: Some(i64::MAX),
             gas: Gas::none(),
         }
     }

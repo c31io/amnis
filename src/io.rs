@@ -30,11 +30,15 @@ impl Namespace {
     }
 
     fn get_name(&self, id: &i32) -> Option<String> {
-        Some(self.name_from_id.get(id)?.clone())
+        Some(self.name_from_id.get(id)?.to_string())
     }
 
     fn get_id(&self, name: &str) -> Option<i32> {
-        Some(self.name_to_id.get(name)?.clone())
+        Some(*self.name_to_id.get(name)?)
+    }
+
+    fn try_get_id(&self, name: &str) -> Result<i32> {
+        self.get_id(name).ok_or(Error::InvalidInput)
     }
 
     fn remove_name(&mut self, name: &str) -> Option<i32> {
@@ -59,13 +63,13 @@ struct Statement {
 }
 
 impl Statement {
-    fn take_tokens(tokens: &mut Vec<Token>, ns: &mut Namespace) -> Result<Vec<Self>> {
+    fn take_tokens(tokens: &mut Vec<Token>, namespace: &mut Namespace) -> Result<Vec<Self>> {
         let mut statements = Vec::new();
         while let Some(end) = tokens.iter().position(|t| *t == Token::EndOfStatement) {
             let mut inputs = Vec::new();
             let mut input_index = 3;
-            while let Token::Input(input) = tokens[input_index] {
-                let input = ns.get_id(&input).ok_or(Error::InvalidInput)?;
+            while let Token::Input(input) = &tokens[input_index] {
+                let input = namespace.try_get_id(input)?;
                 inputs.push(input);
                 input_index += 1;
             }
@@ -75,15 +79,15 @@ impl Statement {
                 Some(i) => i,
                 None => return Err(Error::InvalidInput),
             };
-            while let Token::Output(output) = tokens[output_index] {
-                let output = ns.add_name(&output);
+            while let Token::Output(output) = &tokens[output_index] {
+                let output = namespace.add_name(output);
                 outputs.push(output);
                 output_index += 1;
             }
 
             statements.push(Statement {
-                channel: match tokens[0] {
-                    Token::Channel(c) => c,
+                channel: match &tokens[0] {
+                    Token::Channel(c) => namespace.try_get_id(c)?,
                     _ => return Err(Error::InvalidInput),
                 },
                 function: match tokens[1] {
@@ -109,7 +113,7 @@ impl Statement {
         self.inputs.iter().for_each(|&i| buf.put_i32(i));
         self.outputs.iter().for_each(|&i| buf.put_i32(i));
         if let Some(b) = &self.body {
-            buf.put_slice(&b);
+            buf.put_slice(b);
         }
     }
 }
@@ -137,9 +141,9 @@ fn first_non_whitespace_position(s: &str) -> Option<usize> {
         i += 1;
     }
     if i == s.len() {
-        return None;
+        None
     } else {
-        return Some(i);
+        Some(i)
     }
 }
 
@@ -156,7 +160,7 @@ impl Token {
         Ok(())
     }
 
-    fn take_one(text: &str, tokens: &mut Vec<Token>) -> Result<Option<(Self, usize)>> {
+    fn take_one(text: &str, tokens: &mut [Token]) -> Result<Option<(Self, usize)>> {
         // The last token as the parsing context.
         match tokens.last() {
             // Get Token::Channel
@@ -283,7 +287,7 @@ impl<T> Utf8Input<T> {
         self.inner
     }
 
-    pub fn borrow3(&mut self) -> (&mut String, &mut Vec<Token>, &mut Namespace) {
+    fn borrow3(&mut self) -> (&mut String, &mut Vec<Token>, &mut Namespace) {
         (&mut self.text, &mut self.tokens, &mut self.namespace)
     }
 }
@@ -316,10 +320,10 @@ impl AsyncRead for Utf8Input<Stdin> {
                     Err(_) => return Poll::Ready(Err(std::io::ErrorKind::InvalidInput.into())),
                 };
                 if statements.is_empty() {
-                    return Poll::Pending;
+                    Poll::Pending
                 } else {
                     statements.iter().for_each(|s| s.write(buf));
-                    return Poll::Ready(Ok(()));
+                    Poll::Ready(Ok(()))
                 }
             }
         }
