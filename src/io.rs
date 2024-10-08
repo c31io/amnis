@@ -22,16 +22,11 @@ impl Namespace {
         }
     }
 
-    fn add_name(&mut self, name: &str) -> Option<i32> {
-        match self.name_to_id.get(name) {
-            Some(_) => None,
-            None => {
-                self.last_id += 1;
-                self.name_from_id.insert(self.last_id, name.to_owned());
-                self.name_to_id.insert(name.to_owned(), self.last_id);
-                Some(self.last_id)
-            }
-        }
+    fn add_name(&mut self, name: &str) -> i32 {
+        self.last_id += 1;
+        self.name_from_id.insert(self.last_id, name.to_owned());
+        self.name_to_id.insert(name.to_owned(), self.last_id);
+        self.last_id
     }
 
     fn get_name(&self, id: &i32) -> Option<String> {
@@ -64,12 +59,13 @@ struct Statement {
 }
 
 impl Statement {
-    fn take_tokens(tokens: &mut Vec<Token>) -> Result<Vec<Self>> {
+    fn take_tokens(tokens: &mut Vec<Token>, ns: &mut Namespace) -> Result<Vec<Self>> {
         let mut statements = Vec::new();
         while let Some(end) = tokens.iter().position(|t| *t == Token::EndOfStatement) {
             let mut inputs = Vec::new();
             let mut input_index = 3;
             while let Token::Input(input) = tokens[input_index] {
+                let input = ns.get_id(&input).ok_or(Error::InvalidInput)?;
                 inputs.push(input);
                 input_index += 1;
             }
@@ -80,6 +76,7 @@ impl Statement {
                 None => return Err(Error::InvalidInput),
             };
             while let Token::Output(output) = tokens[output_index] {
+                let output = ns.add_name(&output);
                 outputs.push(output);
                 output_index += 1;
             }
@@ -119,12 +116,12 @@ impl Statement {
 
 #[derive(Clone, PartialEq)]
 pub enum Token {
-    Channel(i32),
+    Channel(String),
     Function(i32),
     InputStart,
-    Input(i32),
+    Input(String),
     InputEnd,
-    Output(i32),
+    Output(String),
     LineFeed,
     Body(Box<[u8]>),
     EndOfStatement,
@@ -169,10 +166,7 @@ impl Token {
                     None => return Ok(None),
                 };
                 match text[i..].find(char::is_whitespace) {
-                    Some(j) => Ok(Some((
-                        Token::Channel(text[i..j].parse().map_err(|_| Error::InvalidInput)?),
-                        j,
-                    ))),
+                    Some(j) => Ok(Some((Token::Channel(text[i..j].to_owned()), j))),
                     None => Ok(None),
                 }
             }
@@ -201,19 +195,39 @@ impl Token {
                     _ => Err(Error::InvalidInput),
                 }
             }
-            // Fet Input or InputEnd
+            // Get Input or InputEnd
             Some(Token::InputStart | Token::Input(_)) => {
-                todo!()
+                let i = match first_non_whitespace_position(text) {
+                    Some(i) => i,
+                    None => return Ok(None),
+                };
+                match text.as_bytes()[i] {
+                    b')' => Ok(Some((Token::InputEnd, i + 1))),
+                    _ => match text[i..].find(char::is_whitespace) {
+                        Some(j) => Ok(Some((Token::Input(text[i..j].to_owned()), j))),
+                        None => Ok(None),
+                    },
+                }
             }
+            // Get Output or LineFeed
             Some(Token::InputEnd | Token::Output(_)) => {
-                // get output or lf
-                todo!()
+                let i = match first_non_whitespace_position(text) {
+                    Some(i) => i,
+                    None => return Ok(None),
+                };
+                match text.as_bytes()[i] {
+                    b'\n' => Ok(Some((Token::LineFeed, i + 1))),
+                    _ => match text[i..].find(char::is_whitespace) {
+                        Some(j) => Ok(Some((Token::Output(text[i..j].to_owned()), j))),
+                        None => Ok(None),
+                    },
+                }
             }
             Some(Token::LineFeed) => {
                 // look back to function
                 let mut i = tokens.len();
                 let has_bin = loop {
-                    // SAFE, Function must exist in tokens.
+                    // SAFETY: Function must exist in tokens.
                     i -= 1;
                     if let Token::Function(f) = tokens[i] {
                         break true; //TODO function.has_bin()
@@ -237,12 +251,13 @@ impl Token {
 }
 
 pin_project! {
-    /// Debug only, this is not a wire format.
+    /// Debug only, this is not the wire format.
     pub struct Utf8Input<T> {
         #[pin]
         inner: T,
         text: String,
         tokens: Vec<Token>,
+        namespace: Namespace,
     }
 }
 
@@ -252,6 +267,7 @@ impl<T> Utf8Input<T> {
             inner,
             text: String::new(),
             tokens: Vec::new(),
+            namespace: Namespace::new(),
         }
     }
 
@@ -267,8 +283,8 @@ impl<T> Utf8Input<T> {
         self.inner
     }
 
-    pub fn borrow_two(&mut self) -> (&mut String, &mut Vec<Token>) {
-        (&mut self.text, &mut self.tokens)
+    pub fn borrow3(&mut self) -> (&mut String, &mut Vec<Token>, &mut Namespace) {
+        (&mut self.text, &mut self.tokens, &mut self.namespace)
     }
 }
 
@@ -290,12 +306,12 @@ impl AsyncRead for Utf8Input<Stdin> {
                 };
                 self.text.push_str(&s);
                 // get tokens
-                let (text, tokens) = self.borrow_two();
+                let (text, tokens, namespace) = self.borrow3();
                 if Token::take(text, tokens).is_err() {
                     return Poll::Ready(Err(std::io::ErrorKind::InvalidInput.into()));
                 }
                 // write statements
-                let statements = match Statement::take_tokens(tokens) {
+                let statements = match Statement::take_tokens(tokens, namespace) {
                     Ok(s) => s,
                     Err(_) => return Poll::Ready(Err(std::io::ErrorKind::InvalidInput.into())),
                 };
