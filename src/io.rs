@@ -119,12 +119,12 @@ impl Statement {
 
 #[derive(Clone, PartialEq)]
 pub enum Token {
-    Channel(String),
+    Channel(i32),
     Function(i32),
     InputStart,
-    Input(String),
+    Input(i32),
     InputEnd,
-    Output(String),
+    Output(i32),
     LineFeed,
     Body(Box<[u8]>),
     EndOfStatement,
@@ -170,7 +170,7 @@ impl Token {
                 };
                 match text[i..].find(char::is_whitespace) {
                     Some(j) => Ok(Some((
-                        Token::Channel(text[i..j].to_owned()),
+                        Token::Channel(text[i..j].parse().map_err(|_| Error::InvalidInput)?),
                         j,
                     ))),
                     None => Ok(None),
@@ -201,47 +201,19 @@ impl Token {
                     _ => Err(Error::InvalidInput),
                 }
             }
-            // Get Input or InputEnd
+            // Fet Input or InputEnd
             Some(Token::InputStart | Token::Input(_)) => {
-                let i = match first_non_whitespace_position(text) {
-                    Some(i) => i,
-                    None => return Ok(None),
-                };
-                match text.as_bytes()[i] {
-                    b')' => Ok(Some((Token::InputEnd, i + 1))),
-                    _ => {
-                        match text[i..].find(char::is_whitespace) {
-                            Some(j) => {
-                                Ok(Some((Token::Input(text[i..j].to_owned()), j)))
-                            },
-                            None => Ok(None),
-                        }
-                    }
-                }
+                todo!()
             }
-            // Get Output or LineFeed
             Some(Token::InputEnd | Token::Output(_)) => {
-                let i = match first_non_whitespace_position(text) {
-                    Some(i) => i,
-                    None => return Ok(None),
-                };
-                match text.as_bytes()[i] {
-                    b'\n' => Ok(Some((Token::LineFeed, i + 1))),
-                    _ => {
-                        match text[i..].find(char::is_whitespace) {
-                            Some(j) => {
-                                Ok(Some((Token::Output(text[i..j].to_owned()), j)))
-                            },
-                            None => Ok(None),
-                        }
-                    }
-                }
+                // get output or lf
+                todo!()
             }
             Some(Token::LineFeed) => {
                 // look back to function
                 let mut i = tokens.len();
                 let has_bin = loop {
-                    // SAFETY: Function must exist in tokens.
+                    // SAFE, Function must exist in tokens.
                     i -= 1;
                     if let Token::Function(f) = tokens[i] {
                         break true; //TODO function.has_bin()
@@ -265,7 +237,7 @@ impl Token {
 }
 
 pin_project! {
-    /// Debug only, this is not the wire format.
+    /// Debug only, this is not a wire format.
     pub struct Utf8Input<T> {
         #[pin]
         inner: T,

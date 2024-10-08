@@ -26,8 +26,6 @@ dependencies = [
  "bytes",
  "futures",
  "pin-project-lite",
- "quote",
- "syn",
  "tokio",
  "tokio-stream",
 ]
