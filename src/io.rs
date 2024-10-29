@@ -131,11 +131,12 @@ pub enum Token {
     EndOfStatement,
 }
 
+/// Find the first whitespace except '\n'.
 fn first_non_whitespace_position(s: &str) -> Option<usize> {
     let mut i = 0;
     while i < s.len() {
-        // safe since
-        if !s.as_bytes()[i].is_ascii_whitespace() {
+        let b = s.as_bytes()[i];
+        if !(b.is_ascii_whitespace() && b != b'\n') {
             break;
         }
         i += 1;
@@ -230,27 +231,40 @@ impl Token {
             Some(Token::LineFeed) => {
                 // look back to function
                 let mut i = tokens.len();
-                let has_bin = loop {
+                let statement_has_bin = loop {
                     // SAFETY: Function must exist in tokens.
                     i -= 1;
                     if let Token::Function(f) = tokens[i] {
-                        break true; //TODO function.has_bin()
+                        break function_has_bin(Function::new(f)?);
                     }
                 };
-                match has_bin {
-                    false => Ok(Some((Token::EndOfStatement, 0))), //TODO length
+                match statement_has_bin {
+                    false => Ok(Some((Token::EndOfStatement, 0))),
                     true => {
-                        todo!()
+                        match first_non_whitespace_position(text) {
+                            Some(i) => {
+                                // use base64::engine::general_purpose::STANDARD;
+                                // TODO else get base64 body
+                                Ok(Token::Body(BASE64))
+                            }
+                            _ => Ok(None),
+                        }
                     }
                 }
-                // if no bin, return eos
-                // else get base64
             }
             Some(Token::Body(..)) => {
-                // get eos
+                // get eos or continue body
                 todo!()
             }
         }
+    }
+}
+
+/// If the function has a binary part in UFT-8 input.
+fn function_has_bin(f: Function) -> bool {
+    match f {
+        Function::Echo => true,
+        _ => false,
     }
 }
 
